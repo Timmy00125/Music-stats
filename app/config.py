@@ -16,11 +16,11 @@ class Settings(BaseSettings):
 
     # Frontend URL for redirection after successful login
     # Example: "http://localhost:3000/auth/callback" or your production frontend URL
-    FRONTEND_CALLBACK_URL: AnyHttpUrl
 
     # API settings
     APP_NAME: str = "Music Stats"
     API_V1_STR: str = "/api/v1"
+    FRONTEND_CALLBACK_URL: AnyHttpUrl = Field(..., env="FRONTEND_CALLBACK_URL")
 
     # JWT Settings
     # Generate a strong secret key, e.g., using: openssl rand -hex 32

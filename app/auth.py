@@ -231,7 +231,7 @@ def login(response: Response):
         max_age=600,  # Expires in 10 minutes
         httponly=True,  # Prevent JS access
         samesite="lax",  # CSRF protection
-        secure=True,  # Only send over HTTPS in production
+        secure=False,  # Only send over HTTPS in production, Change to True in production
         path="/api/v1/auth",  # Scope cookie to auth path
     )
     return response
@@ -318,7 +318,7 @@ def callback(
             max_age=int(jwt_expires.total_seconds()),  # Set cookie expiry to match JWT
             httponly=True,  # Crucial: Makes cookie inaccessible to JavaScript
             samesite="lax",  # Good balance of security and usability
-            secure=True,  # Crucial: Only transmit over HTTPS
+            secure=False,  # Crucial: Only transmit over HTTPS, Change to True in production
             path="/",  # Make cookie available to all paths on the domain
         )
 
@@ -350,6 +350,10 @@ async def logout(response: Response):
     Logs the user out by deleting the access token cookie.
     """
     response.delete_cookie(
-        ACCESS_TOKEN_COOKIE, path="/", secure=True, httponly=True, samesite="lax"
+        ACCESS_TOKEN_COOKIE,
+        path="/",
+        secure=False,  # Change secure=True in production
+        httponly=True,
+        samesite="lax",
     )
     return {"message": "Successfully logged out"}
