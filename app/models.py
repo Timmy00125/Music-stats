@@ -11,6 +11,7 @@ class User(Base):
     """
     User model storing Spotify authentication details
     """
+
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True)
@@ -22,7 +23,11 @@ class User(Base):
     refresh_token = Column(String)
     token_expires_at = Column(DateTime)
     created_at = Column(DateTime, default=func.now())
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime,
+        default=func.now(),
+        onupdate=func.now(),
+    )
 
     # Relationships
     listening_history = relationship("ListeningHistory", back_populates="user")
@@ -34,6 +39,7 @@ class ListeningHistory(Base):
     """
     Model for storing user's listening history
     """
+
     __tablename__ = "listening_history"
 
     id = Column(Integer, primary_key=True)
@@ -56,6 +62,7 @@ class TopArtist(Base):
     """
     Model for storing user's top artists
     """
+
     __tablename__ = "top_artists"
 
     id = Column(Integer, primary_key=True)
@@ -76,6 +83,7 @@ class TopTrack(Base):
     """
     Model for storing user's top tracks
     """
+
     __tablename__ = "top_tracks"
 
     id = Column(Integer, primary_key=True)
@@ -99,6 +107,7 @@ class AudioFeatures(Base):
     """
     Model for storing audio features of tracks
     """
+
     __tablename__ = "audio_features"
 
     id = Column(Integer, primary_key=True)
@@ -116,4 +125,8 @@ class AudioFeatures(Base):
     tempo = Column(Float)
     duration_ms = Column(Integer)
     time_signature = Column(Integer)
-    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    updated_at = Column(
+        DateTime,
+        default=func.now(),
+        onupdate=func.now(),
+    )
