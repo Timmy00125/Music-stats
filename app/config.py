@@ -1,6 +1,5 @@
-import os
 from pydantic_settings import BaseSettings
-from pydantic import PostgresDsn, Field, AnyHttpUrl
+from pydantic import PostgresDsn, AnyHttpUrl
 
 
 class Settings(BaseSettings):
@@ -20,11 +19,11 @@ class Settings(BaseSettings):
     # API settings
     APP_NAME: str = "Music Stats"
     API_V1_STR: str = "/api/v1"
-    FRONTEND_CALLBACK_URL: AnyHttpUrl = Field(..., env="FRONTEND_CALLBACK_URL")
+    FRONTEND_CALLBACK_URL: AnyHttpUrl
 
     # JWT Settings
     # Generate a strong secret key, e.g., using: openssl rand -hex 32
-    JWT_SECRET_KEY: str = Field(..., env="JWT_SECRET_KEY")
+    JWT_SECRET_KEY: str
     JWT_ALGORITHM: str = "HS256"
     # Set an appropriate access token expiry time (e.g., 30 minutes, 1 day)
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24  # 1 day
@@ -41,4 +40,6 @@ class Settings(BaseSettings):
         # JWT_SECRET_KEY=a_very_strong_random_secret_key_here
 
 
+# Values are loaded from environment variables or .env file
+# as configured in the Settings.Config class
 settings = Settings()

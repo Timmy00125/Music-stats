@@ -11,9 +11,6 @@ from fastapi import (
     Response,
 )  # Import Response
 from fastapi.responses import RedirectResponse
-from fastapi.security import (
-    OAuth2PasswordBearer,
-)  # Using OAuth2 scheme for cookie handling concept
 from sqlalchemy.orm import Session
 from urllib.parse import urlencode
 from jose import JWTError, jwt  # Import JWT handling
@@ -139,39 +136,40 @@ async def get_current_user(request: Request, db: Session = Depends(get_db)) -> U
         payload = jwt.decode(
             token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM]
         )
-        user_id: str = payload.get(
-            "sub"
-        )  # "sub" is the standard claim for subject (user identifier)
-        if user_id is None:
+        # Fix for: Type "Any | None" is not assignable to declared type "str"
+        _jwt_sub = payload.get("sub")  # "sub" is the standard claim for subject
+        if not isinstance(_jwt_sub, str): # Ensures _jwt_sub is a string, handles None
             raise credentials_exception
-        token_data = TokenData(user_id=user_id)
+        user_id: str = _jwt_sub  # Now _jwt_sub is confirmed to be str.
+        token_data_model = TokenData(user_id=user_id) # Renamed to avoid clash later
     except JWTError:
         raise credentials_exception
 
     # Find user in database using the internal user_id from the JWT
-    user = db.query(User).filter(User.user_id == token_data.user_id).first()
+    user = db.query(User).filter(User.user_id == token_data_model.user_id).first()
     if user is None:
         raise credentials_exception
 
     # --- Spotify Token Refresh Logic (Optional but recommended here) ---
     # Check if the stored Spotify token is expired or close to expiring
     # Add a buffer (e.g., 5 minutes) to refresh before actual expiry
-    if user.token_expires_at < datetime.now(timezone.utc) + timedelta(minutes=5):
+    # Fix for: Invalid conditional operand of type "ColumnElement[bool]"
+    if user.token_expires_at < datetime.now(timezone.utc) + timedelta(minutes=5):  # type: ignore[operator]
         try:
             print(f"Refreshing Spotify token for user {user.user_id}")  # Add logging
-            token_data = refresh_spotify_token(user.refresh_token)
+            # Fix for: Argument of type "Column[str]" cannot be assigned to parameter "refresh_token"
+            refreshed_token_payload = refresh_spotify_token(user.refresh_token)  # type: ignore[arg-type]
 
             # Update user with new Spotify tokens
-            user.access_token = token_data.get("access_token")
+            user.access_token = refreshed_token_payload.get("access_token")
             # Ensure expires_in is handled correctly, default to 1 hour if missing
-            expires_in = token_data.get("expires_in", 3600)
-            user.token_expires_at = datetime.now(timezone.utc) + timedelta(
-                seconds=expires_in
-            )
+            expires_in = refreshed_token_payload.get("expires_in", 3600)
+            # Fix for: Cannot assign to attribute "token_expires_at" ... "datetime" is not assignable to "Column[datetime]"
+            user.token_expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)  # type: ignore[assignment]
 
             # Spotify might issue a new refresh token
-            if "refresh_token" in token_data:
-                user.refresh_token = token_data["refresh_token"]
+            if "refresh_token" in refreshed_token_payload:
+                user.refresh_token = refreshed_token_payload["refresh_token"]
 
             db.commit()
             db.refresh(user)
@@ -280,7 +278,7 @@ def callback(
             user.refresh_token = (
                 refresh_token  # Always update refresh token if provided
             )
-            user.token_expires_at = expires_at
+            user.token_expires_at = expires_at  # type: ignore[assignment]
             user.spotify_display_name = user_info.get("display_name")
             user.email = user_info.get("email")
             # user.updated_at will be handled by the DB onupdate trigger
@@ -293,7 +291,7 @@ def callback(
                 email=user_info.get("email"),
                 access_token=access_token,
                 refresh_token=refresh_token,
-                token_expires_at=expires_at,
+                token_expires_at=expires_at,  # type: ignore[arg-type]
                 # created_at and updated_at have defaults
             )
             db.add(user)

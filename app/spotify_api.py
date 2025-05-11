@@ -1,7 +1,7 @@
 import requests
 import logging
 from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional
+from typing import List, Dict
 from sqlalchemy.orm import Session
 
 from app.models import User, ListeningHistory, TopArtist, TopTrack, AudioFeatures
@@ -14,6 +14,7 @@ class SpotifyAPI:
     """
     Class to interact with the Spotify Web API
     """
+
     BASE_URL = "https://api.spotify.com/v1"
 
     def __init__(self, user: User, db: Session):
@@ -26,16 +27,20 @@ class SpotifyAPI:
         """
         Check if the access token is expired and refresh if needed
         """
-        if self.user.token_expires_at <= datetime.now():
-            token_data = refresh_spotify_token(self.user.refresh_token)
+        current_time = datetime.now()
+        token_expires = getattr(self.user, "token_expires_at", None)
+        if token_expires is None or current_time >= token_expires:
+            token_data = refresh_spotify_token(str(self.user.refresh_token))
 
             # Update user with new tokens
-            self.user.access_token = token_data.get("access_token")
-            self.user.token_expires_at = datetime.now() + timedelta(seconds=token_data.get("expires_in", 3600))
+            setattr(self.user, "access_token", token_data.get("access_token"))
+            setattr(self.user, "token_expires_at", current_time + timedelta(
+                seconds=token_data.get("expires_in", 3600)
+            ))
 
             # If a new refresh token is provided, update it
             if "refresh_token" in token_data:
-                self.user.refresh_token = token_data["refresh_token"]
+                setattr(self.user, "refresh_token", token_data["refresh_token"])
 
             self.db.commit()
             self.db.refresh(self.user)
@@ -44,13 +49,20 @@ class SpotifyAPI:
             self.access_token = self.user.access_token
             self.headers = {"Authorization": f"Bearer {self.access_token}"}
 
-    def _make_request(self, endpoint: str, method: str = "GET", params: Dict = None, data: Dict = None):
+    def _make_request(
+        self, endpoint: str, method: str = "GET", params: Dict | None = None, data: Dict | None = None
+    ) -> Dict:
         """
         Make a request to the Spotify API with automatic token refresh
         """
         self._check_token()
 
         url = f"{self.BASE_URL}{endpoint}"
+        response = None
+        
+        # Default to empty dict if params or data is None
+        params = params or {}
+        data = data or {}
 
         try:
             if method == "GET":
@@ -66,9 +78,10 @@ class SpotifyAPI:
             return response.json()
         except requests.exceptions.HTTPError as e:
             logger.error(f"HTTP Error: {e}")
-            if response.status_code == 401:
+            response = e.response
+            if response and response.status_code == 401:
                 # Token might be invalid, force refresh
-                self.user.token_expires_at = datetime.now()
+                setattr(self.user, "token_expires_at", None)  # Force token refresh
                 self._check_token()
                 return self._make_request(endpoint, method, params, data)
             raise
@@ -82,41 +95,39 @@ class SpotifyAPI:
         """
         return self._make_request("/me")
 
-    def get_recently_played(self, limit: int = 50, after: int = None, before: int = None):
+    def get_recently_played(
+        self, limit: int = 50, after: int | None = None, before: int | None = None
+    ):
         """
         Get the user's recently played tracks
         """
-        params = {"limit": limit}
-        if after:
+        params: Dict[str, int] = {"limit": limit}
+        if after is not None:
             params["after"] = after
-        if before:
+        if before is not None:
             params["before"] = before
 
         return self._make_request("/me/player/recently-played", params=params)
 
-    def get_top_artists(self, time_range: str = "medium_term", limit: int = 50, offset: int = 0):
+    def get_top_artists(
+        self, time_range: str = "medium_term", limit: int = 50, offset: int = 0
+    ):
         """
         Get the user's top artists
         time_range: 'short_term' (4 weeks), 'medium_term' (6 months), or 'long_term' (years)
         """
-        params = {
-            "time_range": time_range,
-            "limit": limit,
-            "offset": offset
-        }
+        params = {"time_range": time_range, "limit": limit, "offset": offset}
 
         return self._make_request("/me/top/artists", params=params)
 
-    def get_top_tracks(self, time_range: str = "medium_term", limit: int = 50, offset: int = 0):
+    def get_top_tracks(
+        self, time_range: str = "medium_term", limit: int = 50, offset: int = 0
+    ):
         """
         Get the user's top tracks
         time_range: 'short_term' (4 weeks), 'medium_term' (6 months), or 'long_term' (years)
         """
-        params = {
-            "time_range": time_range,
-            "limit": limit,
-            "offset": offset
-        }
+        params = {"time_range": time_range, "limit": limit, "offset": offset}
 
         return self._make_request("/me/top/tracks", params=params)
 
@@ -131,7 +142,7 @@ class SpotifyAPI:
         if len(track_ids) > 100:
             results = []
             for i in range(0, len(track_ids), 100):
-                batch = track_ids[i:i + 100]
+                batch = track_ids[i : i + 100]
                 results.extend(self.get_audio_features(batch))
             return results
 
@@ -145,19 +156,23 @@ class SpotifyAPI:
         """
         try:
             # Get the most recent timestamp in the database
-            latest_played = self.db.query(ListeningHistory) \
-                .filter(ListeningHistory.user_id == self.user.user_id) \
-                .order_by(ListeningHistory.played_at.desc()) \
+            latest_played = (
+                self.db.query(ListeningHistory)
+                .filter(ListeningHistory.user_id == self.user.user_id)
+                .order_by(ListeningHistory.played_at.desc())
                 .first()
+            )
 
             # If we have data, use 'after' parameter to get only new plays
-            after = None
-            if latest_played:
-                # Convert datetime to timestamp in milliseconds
-                after = int(latest_played.played_at.timestamp() * 1000)
+            after_param = None
+            if latest_played is not None:
+                played_at = getattr(latest_played, "played_at", None)
+                if played_at is not None:
+                    # Convert datetime to timestamp in milliseconds
+                    after_param = int(played_at.timestamp() * 1000)
 
             # Get recently played tracks from Spotify
-            data = self.get_recently_played(after=after)
+            data = self.get_recently_played(after=after_param)
             items = data.get("items", [])
 
             # If we didn't get any new tracks, return
@@ -177,13 +192,18 @@ class SpotifyAPI:
                     continue
 
                 # Check if we already have this play
-                played_at = datetime.fromisoformat(item.get("played_at").replace("Z", "+00:00"))
-                existing = self.db.query(ListeningHistory) \
+                played_at = datetime.fromisoformat(
+                    item.get("played_at").replace("Z", "+00:00")
+                )
+                existing = (
+                    self.db.query(ListeningHistory)
                     .filter(
-                    ListeningHistory.user_id == self.user.user_id,
-                    ListeningHistory.track_id == track_id,
-                    ListeningHistory.played_at == played_at
-                ).first()
+                        ListeningHistory.user_id == self.user.user_id,
+                        ListeningHistory.track_id == track_id,
+                        ListeningHistory.played_at == played_at,
+                    )
+                    .first()
+                )
 
                 if existing:
                     continue
@@ -201,7 +221,7 @@ class SpotifyAPI:
                     album_id=album.get("id", ""),
                     album_name=album.get("name", ""),
                     played_at=played_at,
-                    duration_ms=track.get("duration_ms", 0)
+                    duration_ms=track.get("duration_ms", 0),
                 )
 
                 new_tracks.append(new_track)
@@ -217,7 +237,7 @@ class SpotifyAPI:
 
             return {
                 "status": "success",
-                "message": f"Fetched and stored {len(new_tracks)} new tracks"
+                "message": f"Fetched and stored {len(new_tracks)} new tracks",
             }
 
         except Exception as e:
@@ -238,10 +258,8 @@ class SpotifyAPI:
                 artists = artists_data.get("items", [])
 
                 # Clear existing top artists for this user and time range
-                self.db.query(TopArtist) \
-                    .filter(
-                    TopArtist.user_id == self.user.user_id,
-                    TopArtist.term == time_range
+                self.db.query(TopArtist).filter(
+                    TopArtist.user_id == self.user.user_id, TopArtist.term == time_range
                 ).delete()
 
                 # Store new top artists
@@ -253,7 +271,7 @@ class SpotifyAPI:
                         term=time_range,
                         rank=rank,
                         genres=",".join(artist.get("genres", [])),
-                        popularity=artist.get("popularity", 0)
+                        popularity=artist.get("popularity", 0),
                     )
                     self.db.add(top_artist)
 
@@ -262,10 +280,8 @@ class SpotifyAPI:
                 tracks = tracks_data.get("items", [])
 
                 # Clear existing top tracks for this user and time range
-                self.db.query(TopTrack) \
-                    .filter(
-                    TopTrack.user_id == self.user.user_id,
-                    TopTrack.term == time_range
+                self.db.query(TopTrack).filter(
+                    TopTrack.user_id == self.user.user_id, TopTrack.term == time_range
                 ).delete()
 
                 # Track IDs for audio features
@@ -286,7 +302,7 @@ class SpotifyAPI:
                         album_name=album.get("name", ""),
                         term=time_range,
                         rank=rank,
-                        popularity=track.get("popularity", 0)
+                        popularity=track.get("popularity", 0),
                     )
                     self.db.add(top_track)
                     track_ids.append(track.get("id"))
@@ -298,7 +314,7 @@ class SpotifyAPI:
 
             return {
                 "status": "success",
-                "message": "Fetched and stored top artists and tracks"
+                "message": "Fetched and stored top artists and tracks",
             }
 
         except Exception as e:
@@ -318,7 +334,8 @@ class SpotifyAPI:
 
         # Check which track_ids already have audio features
         existing_track_ids = [
-            r[0] for r in self.db.query(AudioFeatures.track_id)
+            r[0]
+            for r in self.db.query(AudioFeatures.track_id)
             .filter(AudioFeatures.track_id.in_(track_ids))
             .all()
         ]
@@ -351,7 +368,7 @@ class SpotifyAPI:
                 valence=feature.get("valence", 0),
                 tempo=feature.get("tempo", 0),
                 duration_ms=feature.get("duration_ms", 0),
-                time_signature=feature.get("time_signature", 4)
+                time_signature=feature.get("time_signature", 4),
             )
             self.db.add(audio_feature)
 

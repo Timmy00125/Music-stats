@@ -9,9 +9,8 @@ from fastapi import (
 )  # Import Request
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from typing import Dict, Any
 
-from app.database import get_db, engine, Base
+from app.database import get_db
 from app.models import User  # Keep User import if needed elsewhere
 from app.config import settings
 
@@ -135,8 +134,8 @@ async def get_basic_insights(
     """
     logger.info(f"Fetching basic insights for user: {current_user.user_id}")
     insights = InsightsGenerator(
-        db, current_user.user_id
-    )  # Use user_id from validated user
+        db, str(current_user.user_id)
+    )  # Convert user_id to string to match expected type
     # Consider adding try-except block for insight generation
     try:
         return insights.get_basic_insights()
@@ -162,7 +161,7 @@ async def get_detailed_insights(
     Get detailed insights about the authenticated user's listening history.
     """
     logger.info(f"Fetching detailed insights for user: {current_user.user_id}")
-    insights = InsightsGenerator(db, current_user.user_id)
+    insights = InsightsGenerator(db, str(current_user.user_id))
     # Consider adding try-except block for insight generation
     try:
         return insights.get_detailed_insights()
