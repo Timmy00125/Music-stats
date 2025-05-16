@@ -153,8 +153,9 @@ async def get_current_user(request: Request, db: Session = Depends(get_db)) -> U
     # --- Spotify Token Refresh Logic (Optional but recommended here) ---
     # Check if the stored Spotify token is expired or close to expiring
     # Add a buffer (e.g., 5 minutes) to refresh before actual expiry
-    # Fix for: Invalid conditional operand of type "ColumnElement[bool]"
-    if user.token_expires_at < datetime.now(timezone.utc) + timedelta(minutes=5):  # type: ignore[operator]
+    # Make naive datetime timezone-aware by replacing it with a timezone-aware one
+    token_expires_at_utc = user.token_expires_at.replace(tzinfo=timezone.utc)
+    if token_expires_at_utc < datetime.now(timezone.utc) + timedelta(minutes=5):
         try:
             print(f"Refreshing Spotify token for user {user.user_id}")  # Add logging
             # Fix for: Argument of type "Column[str]" cannot be assigned to parameter "refresh_token"
@@ -164,8 +165,9 @@ async def get_current_user(request: Request, db: Session = Depends(get_db)) -> U
             user.access_token = refreshed_token_payload.get("access_token")
             # Ensure expires_in is handled correctly, default to 1 hour if missing
             expires_in = refreshed_token_payload.get("expires_in", 3600)
-            # Fix for: Cannot assign to attribute "token_expires_at" ... "datetime" is not assignable to "Column[datetime]"
-            user.token_expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)  # type: ignore[assignment]
+            # Store naive datetime to match the model's DateTime column definition
+            expiry_time = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+            user.token_expires_at = expiry_time.replace(tzinfo=None)
 
             # Spotify might issue a new refresh token
             if "refresh_token" in refreshed_token_payload:
@@ -263,7 +265,9 @@ def callback(
         refresh_token = token_data["refresh_token"]
         # Ensure expires_in is handled correctly, default to 1 hour if missing
         expires_in = token_data.get("expires_in", 3600)
-        expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+        # Create timezone-aware datetime for expiry calculation then convert to naive for storage
+        expires_at_aware = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
+        expires_at = expires_at_aware.replace(tzinfo=None)
 
         # 3. Get user info from Spotify
         user_info = get_spotify_user_info(access_token)
