@@ -159,7 +159,7 @@ async def get_current_user(request: Request, db: Session = Depends(get_db)) -> U
         try:
             print(f"Refreshing Spotify token for user {user.user_id}")  # Add logging
             # Fix for: Argument of type "Column[str]" cannot be assigned to parameter "refresh_token"
-            refreshed_token_payload = refresh_spotify_token(user.refresh_token)  # type: ignore[arg-type]
+            refreshed_token_payload = refresh_spotify_token(str(user.refresh_token))
 
             # Update user with new Spotify tokens
             user.access_token = refreshed_token_payload.get("access_token")
@@ -167,7 +167,8 @@ async def get_current_user(request: Request, db: Session = Depends(get_db)) -> U
             expires_in = refreshed_token_payload.get("expires_in", 3600)
             # Store naive datetime to match the model's DateTime column definition
             expiry_time = datetime.now(timezone.utc) + timedelta(seconds=expires_in)
-            user.token_expires_at = expiry_time.replace(tzinfo=None)
+            # Fix for: "datetime" is not assignable to "Column[datetime]"
+            setattr(user, "token_expires_at", expiry_time.replace(tzinfo=None))
 
             # Spotify might issue a new refresh token
             if "refresh_token" in refreshed_token_payload:
