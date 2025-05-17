@@ -1,7 +1,7 @@
 import requests
 import logging
 from datetime import datetime, timedelta
-from typing import List, Dict
+from typing import List, Dict, Any
 from sqlalchemy.orm import Session
 
 from app.models import User, ListeningHistory, TopArtist, TopTrack, AudioFeatures
@@ -50,8 +50,8 @@ class SpotifyAPI:
             self.headers = {"Authorization": f"Bearer {self.access_token}"}
 
     def _make_request(
-        self, endpoint: str, method: str = "GET", params: Dict | None = None, data: Dict | None = None
-    ) -> Dict:
+        self, endpoint: str, method: str = "GET", params: Dict[str, Any] | None = None, data: Dict[str, Any] | None = None
+    ) -> Dict[str, Any]:
         """
         Make a request to the Spotify API with automatic token refresh
         """
@@ -89,7 +89,7 @@ class SpotifyAPI:
             logger.error(f"Error making request to Spotify API: {e}")
             raise
 
-    def get_user_profile(self):
+    def get_user_profile(self) -> Dict[str, Any]:
         """
         Get the user's Spotify profile
         """
@@ -97,11 +97,11 @@ class SpotifyAPI:
 
     def get_recently_played(
         self, limit: int = 50, after: int | None = None, before: int | None = None
-    ):
+    ) -> Dict[str, Any]:
         """
         Get the user's recently played tracks
         """
-        params: Dict[str, int] = {"limit": limit}
+        params: Dict[str, Any] = {"limit": limit}
         if after is not None:
             params["after"] = after
         if before is not None:
@@ -111,27 +111,27 @@ class SpotifyAPI:
 
     def get_top_artists(
         self, time_range: str = "medium_term", limit: int = 50, offset: int = 0
-    ):
+    ) -> Dict[str, Any]:
         """
         Get the user's top artists
         time_range: 'short_term' (4 weeks), 'medium_term' (6 months), or 'long_term' (years)
         """
-        params = {"time_range": time_range, "limit": limit, "offset": offset}
+        params: Dict[str, Any] = {"time_range": time_range, "limit": limit, "offset": offset}
 
         return self._make_request("/me/top/artists", params=params)
 
     def get_top_tracks(
         self, time_range: str = "medium_term", limit: int = 50, offset: int = 0
-    ):
+    ) -> Dict[str, Any]:
         """
         Get the user's top tracks
         time_range: 'short_term' (4 weeks), 'medium_term' (6 months), or 'long_term' (years)
         """
-        params = {"time_range": time_range, "limit": limit, "offset": offset}
+        params: Dict[str, Any] = {"time_range": time_range, "limit": limit, "offset": offset}
 
         return self._make_request("/me/top/tracks", params=params)
 
-    def get_audio_features(self, track_ids: List[str]):
+    def get_audio_features(self, track_ids: List[str]) -> List[Dict[str, Any]]:
         """
         Get audio features for multiple tracks
         """
@@ -140,7 +140,7 @@ class SpotifyAPI:
 
         # Spotify API limits to 100 IDs per request
         if len(track_ids) > 100:
-            results = []
+            results: List[Dict[str, Any]] = []
             for i in range(0, len(track_ids), 100):
                 batch = track_ids[i : i + 100]
                 results.extend(self.get_audio_features(batch))
@@ -150,7 +150,7 @@ class SpotifyAPI:
         response = self._make_request("/audio-features", params=params)
         return response.get("audio_features", [])
 
-    def fetch_and_store_recently_played(self):
+    def fetch_and_store_recently_played(self) -> Dict[str, str]:
         """
         Fetch and store the user's recently played tracks
         """
@@ -180,8 +180,8 @@ class SpotifyAPI:
                 return {"status": "success", "message": "No new tracks to fetch"}
 
             # Process and store each track
-            new_tracks = []
-            track_ids = []
+            new_tracks: List[ListeningHistory] = [] # Add type hint
+            track_ids: List[str] = [] # Add type hint
             for item in items:
                 # Extract necessary data
                 track = item.get("track", {})
@@ -245,7 +245,7 @@ class SpotifyAPI:
             logger.error(f"Error fetching recently played: {e}")
             return {"status": "error", "message": str(e)}
 
-    def fetch_and_store_top_items(self):
+    def fetch_and_store_top_items(self) -> Dict[str, str]:
         """
         Fetch and store the user's top artists and tracks
         """
@@ -285,7 +285,7 @@ class SpotifyAPI:
                 ).delete()
 
                 # Track IDs for audio features
-                track_ids = []
+                track_ids: List[str] = [] # Add type hint
 
                 # Store new top tracks
                 for rank, track in enumerate(tracks, 1):

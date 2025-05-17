@@ -2,8 +2,6 @@ from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Float
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import uuid
-from datetime import datetime
-
 from app.database import Base
 
 
@@ -112,19 +110,19 @@ class AudioFeatures(Base):
 
     id = Column(Integer, primary_key=True)
     track_id = Column(String, unique=True, index=True)
-    danceability = Column(Float)
-    energy = Column(Float)
-    key = Column(Integer)
-    loudness = Column(Float)
-    mode = Column(Integer)
-    speechiness = Column(Float)
-    acousticness = Column(Float)
-    instrumentalness = Column(Float)
-    liveness = Column(Float)
-    valence = Column(Float)
-    tempo = Column(Float)
-    duration_ms = Column(Integer)
-    time_signature = Column(Integer)
+    danceability = Column(Float)  # type: ignore
+    energy = Column(Float)  # type: ignore
+    key = Column(Integer)  # type: ignore
+    loudness = Column(Float)  # type: ignore
+    mode = Column(Integer)  # type: ignore
+    speechiness = Column(Float)  # type: ignore
+    acousticness = Column(Float)  # type: ignore
+    instrumentalness = Column(Float)  # type: ignore
+    liveness = Column(Float)  # type: ignore
+    valence = Column(Float)  # type: ignore
+    tempo = Column(Float)  # type: ignore
+    duration_ms = Column(Integer)  # type: ignore
+    time_signature = Column(Integer)  # type: ignore
     updated_at = Column(
         DateTime,
         default=func.now(),

@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc, distinct
 from datetime import datetime, timedelta
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Tuple
 
 from app.models import ListeningHistory, TopArtist, TopTrack, AudioFeatures
 
@@ -19,7 +19,7 @@ class InsightsGenerator:
         """
         Generate basic insights about user's listening history
         """
-        insights = {
+        insights: Dict[str, Any] = {
             "total_tracks_listened": self._get_total_tracks_listened(),
             "top_artists": self._get_top_artists(),
             "top_tracks": self._get_top_tracks(),
@@ -157,22 +157,27 @@ class InsightsGenerator:
         }
 
         # Initialize results
-        results = {period: 0 for period in time_ranges.keys()}
+        results: Dict[str, int] = {period: 0 for period in time_ranges.keys()}
 
         # Query all played times
-        played_times = (
+        played_time_tuples = (
             self.db.query(ListeningHistory.played_at)
             .filter(ListeningHistory.user_id == self.user_id)
             .all()
         )
 
         # Count plays in each time range
-        for pt in played_times:
-            hour = pt.played_at.hour
-            for period, (start, end) in time_ranges.items():
-                if start <= hour < end:
-                    results[period] += 1
-                    break
+        for pt_tuple in played_time_tuples:
+            played_at_time = pt_tuple[
+                0
+            ]  # Querying a single column returns a list of tuples
+            if isinstance(played_at_time, datetime):
+                hour = played_at_time.hour
+                for period, (start, end) in time_ranges.items():
+                    if start <= hour < end:
+                        results[period] += 1
+                        break
+            # else: Consider logging or handling if played_at_time is not a datetime object
 
         return results
 
@@ -220,12 +225,12 @@ class InsightsGenerator:
         Get average audio features for user's listening history
         """
         # Get all track IDs from user's listening history
-        track_ids = [
-            r[0]
-            for r in self.db.query(distinct(ListeningHistory.track_id))
+        track_ids_tuples = (
+            self.db.query(distinct(ListeningHistory.track_id))
             .filter(ListeningHistory.user_id == self.user_id)
             .all()
-        ]
+        )
+        track_ids: List[str] = [r[0] for r in track_ids_tuples]
 
         if not track_ids:
             return {}
@@ -241,18 +246,20 @@ class InsightsGenerator:
             "valence",
         ]
 
-        results = {}
+        avg_results: Dict[str, float] = {}
         for field in feature_fields:
-            avg_value = (
+            avg_value_query_result = (
                 self.db.query(func.avg(getattr(AudioFeatures, field)))
                 .filter(AudioFeatures.track_id.in_(track_ids))
                 .scalar()
-                or 0
+            )
+            avg_value = (
+                avg_value_query_result if avg_value_query_result is not None else 0.0
             )
 
-            results[field] = round(avg_value, 3)
+            avg_results[field] = round(avg_value, 3)
 
-        return results
+        return avg_results
 
     def get_detailed_insights(self) -> Dict[str, Any]:
         """
@@ -261,7 +268,7 @@ class InsightsGenerator:
         basic_insights = self.get_basic_insights()
 
         # Add more detailed insights
-        detailed_insights = {
+        detailed_insights: Dict[str, Any] = {
             **basic_insights,
             "genre_distribution": self._get_genre_distribution(),
             "listening_trends_by_month": self._get_listening_trends_by_month(),
@@ -272,75 +279,93 @@ class InsightsGenerator:
         return detailed_insights
 
     def _get_genre_distribution(self, limit: int = 10) -> List[Dict[str, Any]]:
-            """
-            Get the distribution of genres based on top artists
-            """
-            top_artists = (
-                self.db.query(TopArtist)
-                .filter(
-                    TopArtist.user_id == self.user_id,
-                    TopArtist.term
-                    == "medium_term",  # Use medium term for better representation
-                )
-                .all()
+        """
+        Get the distribution of genres based on top artists
+        """
+        top_artists_results = (
+            self.db.query(TopArtist)
+            .filter(
+                TopArtist.user_id == self.user_id,
+                TopArtist.term
+                == "medium_term",  # Use medium term for better representation
             )
+            .all()
+        )
 
-            # Count genres
-            genre_counts = {}
-            for artist in top_artists:
-                # Fix: Check if genres attribute is None or empty properly
-                genre_string = getattr(artist, 'genres', '') or ''
-                genres = genre_string.split(",") if genre_string else []
-                for genre in genres:
-                    if genre:
-                        genre_counts[genre] = genre_counts.get(genre, 0) + (
-                            50 - artist.rank + 1
-                        )  # Weight by rank
+        genre_counts: Dict[str, int] = {}
+        for artist in top_artists_results:
+            genre_string: str = getattr(artist, "genres", "") or ""
+            artist_rank: int = getattr(
+                artist, "rank", 0
+            )  # Default to 0 if rank is not found
 
-            # Sort and limit
-            sorted_genres = sorted(genre_counts.items(), key=lambda x: x[1], reverse=True)[
-                :limit
-            ]
+            genres_list: List[str] = genre_string.split(",") if genre_string else []
+            for genre_item_raw in genres_list:
+                genre_item = genre_item_raw.strip()
+                if genre_item:
+                    score_weight: int = 50 - artist_rank + 1
+                    genre_counts[genre_item] = (
+                        genre_counts.get(genre_item, 0) + score_weight
+                    )
 
-            return [{"genre": genre, "score": score} for genre, score in sorted_genres]
+        sorted_genres_tuples: List[Tuple[str, int]] = sorted(
+            genre_counts.items(), key=lambda item: item[1], reverse=True
+        )[:limit]
+
+        return [{"genre": g, "score": s} for g, s in sorted_genres_tuples]
 
     def _get_listening_trends_by_month(self, months: int = 6) -> Dict[str, int]:
         """
-        Get listening trends by month for the last 6 months
+        Get listening trends by month for the last N months
         """
-        result = {}
+        result: Dict[str, int] = {}
         now = datetime.now()
 
-        # Generate month labels and query for each month
         for i in range(months - 1, -1, -1):
-            month_start = (
-                now.replace(day=1)
-                - timedelta(days=now.day - 1)
-                - timedelta(days=30 * i)
-            ).replace(hour=0, minute=0, second=0, microsecond=0)
-            if i > 0:
-                month_end = (
-                    now.replace(day=1)
-                    - timedelta(days=now.day - 1)
-                    - timedelta(days=30 * (i - 1))
-                ).replace(hour=0, minute=0, second=0, microsecond=0)
-            else:
-                month_end = now
+            current_month_zero_indexed = now.month - 1
 
-            month_label = month_start.strftime("%Y-%m")
+            # Calculate total months from year 0 up to current month, then subtract i
+            total_months_from_epoch_current = now.year * 12 + current_month_zero_indexed
+            total_months_from_epoch_target = total_months_from_epoch_current - i
+
+            target_year = total_months_from_epoch_target // 12
+            target_month_one_indexed = (total_months_from_epoch_target % 12) + 1
+
+            month_start_dt = datetime(
+                target_year, target_month_one_indexed, 1, 0, 0, 0, 0
+            )
+
+            if target_month_one_indexed == 12:
+                next_month_start_dt = datetime(target_year + 1, 1, 1, 0, 0, 0, 0)
+            else:
+                next_month_start_dt = datetime(
+                    target_year, target_month_one_indexed + 1, 1, 0, 0, 0, 0
+                )
+
+            # Determine month_end_dt
+            # If this iteration is for the current calendar month (i.e., i=0 and calculated year/month match now's year/month)
+            # then the end date is 'now'. Otherwise, it's the start of the next month.
+            if (
+                i == 0
+                and target_year == now.year
+                and target_month_one_indexed == now.month
+            ):
+                month_end_dt = now
+            else:
+                month_end_dt = next_month_start_dt
+
+            month_label = month_start_dt.strftime("%Y-%m")
 
             count = (
                 self.db.query(ListeningHistory)
                 .filter(
                     ListeningHistory.user_id == self.user_id,
-                    ListeningHistory.played_at >= month_start,
-                    ListeningHistory.played_at < month_end,
+                    ListeningHistory.played_at >= month_start_dt,
+                    ListeningHistory.played_at < month_end_dt,
                 )
                 .count()
             )
-
             result[month_label] = count
-
         return result
 
     def _get_popular_vs_obscure_ratio(self) -> Dict[str, Any]:
@@ -349,33 +374,36 @@ class InsightsGenerator:
         Based on Spotify's popularity score (0-100)
         """
         # Get average popularity from top tracks
-        avg_popularity = (
+        avg_popularity_query_result = (
             self.db.query(func.avg(TopTrack.popularity))
             .filter(
                 TopTrack.user_id == self.user_id,
                 TopTrack.term.in_(["short_term", "medium_term"]),
             )
             .scalar()
-            or 50
-        )  # Default to 50 if no data
+        )
+        avg_popularity = (
+            avg_popularity_query_result
+            if avg_popularity_query_result is not None
+            else 50.0
+        )
 
-        # Count tracks in different popularity brackets
         brackets = {
-            "mainstream": (80, 100),  # Very popular
+            "mainstream": (80, 101),  # Very popular (inclusive of 100)
             "popular": (60, 80),  # Popular
             "mixed": (40, 60),  # Moderate popularity
             "niche": (20, 40),  # Less popular
             "obscure": (0, 20),  # Very obscure
         }
 
-        counts = {}
+        counts: Dict[str, int] = {}
         for label, (min_pop, max_pop) in brackets.items():
             count = (
                 self.db.query(TopTrack)
                 .filter(
                     TopTrack.user_id == self.user_id,
                     TopTrack.popularity >= min_pop,
-                    TopTrack.popularity < max_pop,
+                    TopTrack.popularity < max_pop,  # max_pop is exclusive
                     TopTrack.term.in_(["short_term", "medium_term"]),
                 )
                 .count()
@@ -391,56 +419,74 @@ class InsightsGenerator:
         """
         Analyze the overall mood of the user's music based on audio features
         """
-        # Get all track IDs from user's listening history
-        track_ids = [
-            r[0]
-            for r in self.db.query(distinct(ListeningHistory.track_id))
+        track_ids_tuples = (
+            self.db.query(distinct(ListeningHistory.track_id))
             .filter(ListeningHistory.user_id == self.user_id)
             .all()
-        ]
+        )
+        track_ids: List[str] = [r[0] for r in track_ids_tuples]
 
         if not track_ids:
-            return {}
+            # Return a default structure if no track_ids to avoid errors downstream
+            return {
+                "primary_mood": "Unknown",
+                "mood_indicators": {
+                    "happiness": 0.0,
+                    "energy": 0.0,
+                    "danceability": 0.0,
+                    "calmness": 0.0,
+                },
+                "mood_quadrant_values": {"valence": 0.0, "energy": 0.0},
+            }
 
         # Get average values for mood-related features
-        avg_valence = (
-            self.db.query(func.avg(AudioFeatures.valence))
+        avg_valence_qr = (
+            self.db.query(func.avg(AudioFeatures.valence))  # type: ignore
             .filter(AudioFeatures.track_id.in_(track_ids))
             .scalar()
-            or 0.5
         )
+        avg_valence = avg_valence_qr if avg_valence_qr is not None else 0.5
 
-        avg_energy = (
-            self.db.query(func.avg(AudioFeatures.energy))
+        avg_energy_qr = (
+            self.db.query(func.avg(AudioFeatures.energy))  # type: ignore
             .filter(AudioFeatures.track_id.in_(track_ids))
             .scalar()
-            or 0.5
         )
+        avg_energy = avg_energy_qr if avg_energy_qr is not None else 0.5
 
+        avg_danceability_qr = (
+            self.db.query(func.avg(AudioFeatures.danceability))  # type: ignore
+            .filter(AudioFeatures.track_id.in_(track_ids))
+            .scalar()
+        )
         avg_danceability = (
-            self.db.query(func.avg(AudioFeatures.danceability))
-            .filter(AudioFeatures.track_id.in_(track_ids))
-            .scalar()
-            or 0.5
+            avg_danceability_qr if avg_danceability_qr is not None else 0.5
         )
 
         # Determine mood quadrant
-        # High valence + high energy = Exuberant
-        # High valence + low energy = Relaxed
-        # Low valence + high energy = Tense/Angry
-        # Low valence + low energy = Sad/Depressed
-
-        moods = {
+        mood_map: Dict[str, bool] = {
             "Exuberant": avg_valence > 0.5 and avg_energy > 0.5,
             "Relaxed": avg_valence > 0.5 and avg_energy <= 0.5,
             "Tense": avg_valence <= 0.5 and avg_energy > 0.5,
             "Melancholy": avg_valence <= 0.5 and avg_energy <= 0.5,
         }
 
-        primary_mood = max(moods.items(), key=lambda x: x[1])[0]
+        # Find the primary mood; default if none are true (should not happen with these conditions)
+        primary_mood = "Unknown"
+        for mood, is_active in mood_map.items():
+            if is_active:
+                primary_mood = mood
+                break
 
-        # Calculate some additional mood indicators
-        mood_indicators = {
+        # Fallback if no mood is explicitly true (e.g. if valence or energy is exactly 0.5 in some edge cases)
+        # This logic ensures one mood is always primary.
+        if primary_mood == "Unknown":
+            if avg_valence > 0.5:
+                primary_mood = "Exuberant" if avg_energy > 0.5 else "Relaxed"
+            else:
+                primary_mood = "Tense" if avg_energy > 0.5 else "Melancholy"
+
+        mood_indicators: Dict[str, float] = {
             "happiness": avg_valence,
             "energy": avg_energy,
             "danceability": avg_danceability,

@@ -42,4 +42,4 @@ class Settings(BaseSettings):
 
 # Values are loaded from environment variables or .env file
 # as configured in the Settings.Config class
-settings = Settings()
+settings = Settings()  # type: ignore

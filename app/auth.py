@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from urllib.parse import urlencode
 from jose import JWTError, jwt  # Import JWT handling
 from pydantic import BaseModel
+from typing import Any  # Import Any for precise type hinting
 
 from app.database import get_db
 from app.models import User
@@ -46,7 +47,7 @@ class TokenData(BaseModel):
 
 
 # --- JWT Utilities ---
-def create_access_token(data: dict, expires_delta: timedelta | None = None):
+def create_access_token(data: dict[str, Any], expires_delta: timedelta | None = None):
     """Creates a JWT access token"""
     to_encode = data.copy()
     if expires_delta:
@@ -138,10 +139,10 @@ async def get_current_user(request: Request, db: Session = Depends(get_db)) -> U
         )
         # Fix for: Type "Any | None" is not assignable to declared type "str"
         _jwt_sub = payload.get("sub")  # "sub" is the standard claim for subject
-        if not isinstance(_jwt_sub, str): # Ensures _jwt_sub is a string, handles None
+        if not isinstance(_jwt_sub, str):  # Ensures _jwt_sub is a string, handles None
             raise credentials_exception
         user_id: str = _jwt_sub  # Now _jwt_sub is confirmed to be str.
-        token_data_model = TokenData(user_id=user_id) # Renamed to avoid clash later
+        token_data_model = TokenData(user_id=user_id)  # Renamed to avoid clash later
     except JWTError:
         raise credentials_exception
 
