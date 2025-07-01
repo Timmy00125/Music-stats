@@ -1,23 +1,26 @@
 import logging
+
 from fastapi import (
-    FastAPI,
-    Depends,
-    HTTPException,
     BackgroundTasks,
+    Depends,
+    FastAPI,
+    HTTPException,
     Request,
     status,
 )  # Import Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
-from app.database import get_db
-from app.models import User  # Keep User import if needed elsewhere
-from app.config import settings
+from app.auth import get_current_user
 
 # Import the specific function, not the whole router if using Depends
-from app.auth import router as auth_router, get_current_user
-from app.spotify_api import SpotifyAPI
+from app.auth import router as auth_router
+from app.config import settings
+from app.database import get_db
 from app.insights import InsightsGenerator
+from app.models import User  # Keep User import if needed elsewhere
+from app.spotify_api import SpotifyAPI
 
 # Create all tables in the database (consider using Alembic for migrations in production)
 # Base.metadata.create_all(bind=engine) # Comment out if using migrations
@@ -182,9 +185,9 @@ async def get_api_status():
 
 
 # --- Optional: Add Exception Handlers for better error responses ---
-from fastapi.responses import JSONResponse
 
 
+@app.exception_handler(HTTPException)
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
     # You can customize the error response format here
