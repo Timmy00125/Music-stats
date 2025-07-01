@@ -1,9 +1,10 @@
-from sqlalchemy.orm import Session
-from sqlalchemy import func, desc, distinct
 from datetime import datetime, timedelta
-from typing import Dict, List, Any, Tuple
+from typing import Any, Dict, List, Tuple
 
-from app.models import ListeningHistory, TopArtist, TopTrack, AudioFeatures
+from sqlalchemy import desc, distinct, func
+from sqlalchemy.orm import Session
+
+from app.models import AudioFeatures, ListeningHistory, TopArtist, TopTrack
 
 
 class InsightsGenerator:

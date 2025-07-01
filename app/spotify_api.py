@@ -1,11 +1,12 @@
-import requests
 import logging
 from datetime import datetime, timedelta
-from typing import List, Dict, Any
+from typing import Any, Dict, List
+
+import requests
 from sqlalchemy.orm import Session
 
-from app.models import User, ListeningHistory, TopArtist, TopTrack, AudioFeatures
 from app.auth import refresh_spotify_token
+from app.models import AudioFeatures, ListeningHistory, TopArtist, TopTrack, User
 
 logger = logging.getLogger(__name__)
 
@@ -34,9 +35,11 @@ class SpotifyAPI:
 
             # Update user with new tokens
             setattr(self.user, "access_token", token_data.get("access_token"))
-            setattr(self.user, "token_expires_at", current_time + timedelta(
-                seconds=token_data.get("expires_in", 3600)
-            ))
+            setattr(
+                self.user,
+                "token_expires_at",
+                current_time + timedelta(seconds=token_data.get("expires_in", 3600)),
+            )
 
             # If a new refresh token is provided, update it
             if "refresh_token" in token_data:
@@ -50,7 +53,11 @@ class SpotifyAPI:
             self.headers = {"Authorization": f"Bearer {self.access_token}"}
 
     def _make_request(
-        self, endpoint: str, method: str = "GET", params: Dict[str, Any] | None = None, data: Dict[str, Any] | None = None
+        self,
+        endpoint: str,
+        method: str = "GET",
+        params: Dict[str, Any] | None = None,
+        data: Dict[str, Any] | None = None,
     ) -> Dict[str, Any]:
         """
         Make a request to the Spotify API with automatic token refresh
@@ -59,7 +66,7 @@ class SpotifyAPI:
 
         url = f"{self.BASE_URL}{endpoint}"
         response = None
-        
+
         # Default to empty dict if params or data is None
         params = params or {}
         data = data or {}
@@ -116,7 +123,11 @@ class SpotifyAPI:
         Get the user's top artists
         time_range: 'short_term' (4 weeks), 'medium_term' (6 months), or 'long_term' (years)
         """
-        params: Dict[str, Any] = {"time_range": time_range, "limit": limit, "offset": offset}
+        params: Dict[str, Any] = {
+            "time_range": time_range,
+            "limit": limit,
+            "offset": offset,
+        }
 
         return self._make_request("/me/top/artists", params=params)
 
@@ -127,7 +138,11 @@ class SpotifyAPI:
         Get the user's top tracks
         time_range: 'short_term' (4 weeks), 'medium_term' (6 months), or 'long_term' (years)
         """
-        params: Dict[str, Any] = {"time_range": time_range, "limit": limit, "offset": offset}
+        params: Dict[str, Any] = {
+            "time_range": time_range,
+            "limit": limit,
+            "offset": offset,
+        }
 
         return self._make_request("/me/top/tracks", params=params)
 
@@ -180,8 +195,8 @@ class SpotifyAPI:
                 return {"status": "success", "message": "No new tracks to fetch"}
 
             # Process and store each track
-            new_tracks: List[ListeningHistory] = [] # Add type hint
-            track_ids: List[str] = [] # Add type hint
+            new_tracks: List[ListeningHistory] = []  # Add type hint
+            track_ids: List[str] = []  # Add type hint
             for item in items:
                 # Extract necessary data
                 track = item.get("track", {})
@@ -285,7 +300,7 @@ class SpotifyAPI:
                 ).delete()
 
                 # Track IDs for audio features
-                track_ids: List[str] = [] # Add type hint
+                track_ids: List[str] = []  # Add type hint
 
                 # Store new top tracks
                 for rank, track in enumerate(tracks, 1):

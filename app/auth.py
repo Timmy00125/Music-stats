@@ -1,25 +1,26 @@
 import base64
-import requests
 import secrets
 from datetime import datetime, timedelta, timezone  # Import timezone
+from typing import Any  # Import Any for precise type hinting
+from urllib.parse import urlencode
+
+import requests
 from fastapi import (
+    APIRouter,
     Depends,
     HTTPException,
-    status,
-    APIRouter,
     Request,
     Response,
+    status,
 )  # Import Response
 from fastapi.responses import RedirectResponse
-from sqlalchemy.orm import Session
-from urllib.parse import urlencode
 from jose import JWTError, jwt  # Import JWT handling
 from pydantic import BaseModel
-from typing import Any  # Import Any for precise type hinting
+from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.database import get_db
 from app.models import User
-from app.config import settings
 
 router = APIRouter()
 
