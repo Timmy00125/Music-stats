@@ -2,9 +2,11 @@
 Tests for app.auth module.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch, Mock
 import pytest
+from typing import Any, Dict
+from unittest.mock import MagicMock
 from app.auth import (
     create_access_token,
     get_spotify_tokens,
@@ -13,17 +15,20 @@ from app.auth import (
 )
 
 
-def test_create_access_token():
+def test_create_access_token() -> None:
     """Test JWT token generation returns a string."""
-    data = {"sub": "test_user", "exp": datetime.utcnow() + timedelta(minutes=15)}
+    data: Dict[str, Any] = {
+        "sub": "test_user",
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=15),
+    }
     token = create_access_token(data)
     assert isinstance(token, str)
     assert len(token) > 0
 
 
-def test_create_access_token_with_expires_delta():
+def test_create_access_token_with_expires_delta() -> None:
     """Test JWT token generation with custom expiration."""
-    data = {"sub": "test_user"}
+    data: Dict[str, Any] = {"sub": "test_user"}
     expires_delta = timedelta(hours=1)
     token = create_access_token(data, expires_delta)
     assert isinstance(token, str)
@@ -31,7 +36,7 @@ def test_create_access_token_with_expires_delta():
 
 
 @patch("app.auth.requests.post")
-def test_get_spotify_tokens_success(mock_post):
+def test_get_spotify_tokens_success(mock_post: MagicMock) -> None:
     """Test successful Spotify token exchange."""
     mock_response = Mock()
     mock_response.json.return_value = {
@@ -49,7 +54,7 @@ def test_get_spotify_tokens_success(mock_post):
 
 
 @patch("app.auth.requests.post")
-def test_refresh_spotify_token_success(mock_post):
+def test_refresh_spotify_token_success(mock_post: MagicMock) -> None:
     """Test successful Spotify token refresh."""
     mock_response = Mock()
     mock_response.json.return_value = {
@@ -65,7 +70,7 @@ def test_refresh_spotify_token_success(mock_post):
 
 
 @patch("app.auth.requests.get")
-def test_get_spotify_user_info_success(mock_get):
+def test_get_spotify_user_info_success(mock_get: MagicMock) -> None:
     """Test successful Spotify user info retrieval."""
     mock_response = Mock()
     mock_response.json.return_value = {
@@ -83,7 +88,7 @@ def test_get_spotify_user_info_success(mock_get):
 
 
 @patch("app.auth.requests.post")
-def test_get_spotify_tokens_failure(mock_post):
+def test_get_spotify_tokens_failure(mock_post: MagicMock) -> None:
     """Test Spotify token exchange failure."""
     mock_response = Mock()
     mock_response.raise_for_status.side_effect = Exception("HTTP Error")

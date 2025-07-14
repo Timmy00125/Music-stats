@@ -2,7 +2,6 @@
 Tests for app.models module.
 """
 
-import pytest
 from datetime import datetime, timedelta
 from app.models import User, ListeningHistory, AudioFeatures, TopArtist, TopTrack
 from sqlalchemy.orm import Session
@@ -23,9 +22,9 @@ def test_user_creation(db_session: Session):
 
     assert user.id is not None
     assert user.user_id is not None  # Should be auto-generated UUID
-    assert user.spotify_user_id == "spotify_123"
-    assert user.spotify_display_name == "Test User"
-    assert user.email == "test@example.com"
+    assert user.spotify_user_id == "spotify_123"  # type: ignore
+    assert user.spotify_display_name == "Test User"  # type: ignore
+    assert user.email == "test@example.com"  # type: ignore
     assert user.created_at is not None
     assert user.updated_at is not None
 
@@ -51,12 +50,12 @@ def test_listening_history_creation(db_session: Session):
     db_session.commit()
 
     assert listening_record.id is not None
-    assert listening_record.user_id == user.user_id
-    assert listening_record.track_id == "track_123"
-    assert listening_record.track_name == "Test Track"
-    assert listening_record.artist_id == "artist_123"
-    assert listening_record.artist_name == "Test Artist"
-    assert listening_record.duration_ms == 180000
+    assert listening_record.user_id == user.user_id  # type: ignore
+    assert listening_record.track_id == "track_123"  # type: ignore
+    assert listening_record.track_name == "Test Track"  # type: ignore
+    assert listening_record.artist_id == "artist_123"  # type: ignore
+    assert listening_record.artist_name == "Test Artist"  # type: ignore
+    assert listening_record.duration_ms == 180000  # type: ignore
 
 
 def test_audio_features_creation(db_session: Session):
@@ -76,11 +75,11 @@ def test_audio_features_creation(db_session: Session):
     db_session.commit()
 
     assert audio_features.id is not None
-    assert audio_features.track_id == "track_123"
-    assert audio_features.danceability == 0.7
-    assert audio_features.energy == 0.8
-    assert audio_features.valence == 0.6
-    assert audio_features.tempo == 120.0
+    assert audio_features.track_id == "track_123"  # type: ignore
+    assert audio_features.danceability == 0.7  # type: ignore
+    assert audio_features.energy == 0.8  # type: ignore
+    assert audio_features.valence == 0.6  # type: ignore
+    assert audio_features.tempo == 120.0  # type: ignore
 
 
 def test_top_artist_creation(db_session: Session):
@@ -103,12 +102,12 @@ def test_top_artist_creation(db_session: Session):
     db_session.commit()
 
     assert top_artist.id is not None
-    assert top_artist.user_id == user.user_id
-    assert top_artist.artist_id == "artist_123"
-    assert top_artist.artist_name == "Test Artist"
-    assert top_artist.term == "medium_term"
-    assert top_artist.rank == 1
-    assert top_artist.genres == '["pop", "rock"]'
+    assert top_artist.user_id == user.user_id  # type: ignore
+    assert top_artist.artist_id == "artist_123"  # type: ignore
+    assert top_artist.artist_name == "Test Artist"  # type: ignore
+    assert top_artist.term == "medium_term"  # type: ignore
+    assert top_artist.rank == 1  # type: ignore
+    assert top_artist.genres == '["pop", "rock"]'  # type: ignore
 
 
 def test_top_track_creation(db_session: Session):
@@ -133,14 +132,14 @@ def test_top_track_creation(db_session: Session):
     db_session.commit()
 
     assert top_track.id is not None
-    assert top_track.user_id == user.user_id
-    assert top_track.track_id == "track_123"
-    assert top_track.track_name == "Test Track"
-    assert top_track.artist_id == "artist_123"
-    assert top_track.artist_name == "Test Artist"
-    assert top_track.term == "medium_term"
-    assert top_track.rank == 1
-    assert top_track.popularity == 80
+    assert top_track.user_id == user.user_id  # type: ignore
+    assert top_track.track_id == "track_123"  # type: ignore
+    assert top_track.track_name == "Test Track"  # type: ignore
+    assert top_track.artist_id == "artist_123"  # type: ignore
+    assert top_track.artist_name == "Test Artist"  # type: ignore
+    assert top_track.term == "medium_term"  # type: ignore
+    assert top_track.rank == 1  # type: ignore
+    assert top_track.popularity == 80  # type: ignore
 
 
 def test_user_relationships(db_session: Session):
@@ -187,6 +186,6 @@ def test_user_relationships(db_session: Session):
     assert len(user.listening_history) == 1
     assert len(user.top_artists) == 1
     assert len(user.top_tracks) == 1
-    assert user.listening_history[0].track_name == "Test Track"
-    assert user.top_artists[0].artist_name == "Test Artist"
-    assert user.top_tracks[0].track_name == "Test Track"
+    assert user.listening_history[0].track_name == "Test Track"  # type: ignore
+    assert user.top_artists[0].artist_name == "Test Artist"  # type: ignore
+    assert user.top_tracks[0].track_name == "Test Track"  # type: ignore

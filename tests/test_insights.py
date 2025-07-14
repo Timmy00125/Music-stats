@@ -4,7 +4,7 @@ Tests for app.insights module.
 
 import pytest
 from app.insights import InsightsGenerator
-from app.models import ListeningHistory, User, AudioFeatures, TopArtist, TopTrack
+from app.models import ListeningHistory, User, AudioFeatures
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
 
@@ -29,7 +29,7 @@ def test_user(db_session: Session) -> User:
 @pytest.fixture
 def insights_generator(db_session: Session, test_user: User) -> InsightsGenerator:
     """Create an InsightsGenerator instance with test user."""
-    return InsightsGenerator(db=db_session, user_id=test_user.user_id)
+    return InsightsGenerator(db=db_session, user_id=str(test_user.user_id))  # type: ignore
 
 
 @pytest.fixture
@@ -113,7 +113,8 @@ def test_get_detailed_insights_empty(insights_generator: InsightsGenerator):
 
 
 def test_get_basic_insights_with_data(
-    insights_generator: InsightsGenerator, sample_listening_data
+    insights_generator: InsightsGenerator,
+    sample_listening_data,  # type: ignore
 ):
     """Test get_basic_insights with sample data."""
     result = insights_generator.get_basic_insights()
@@ -126,18 +127,20 @@ def test_get_basic_insights_with_data(
 
 
 def test_total_tracks_listened(
-    insights_generator: InsightsGenerator, sample_listening_data
+    insights_generator: InsightsGenerator,
+    sample_listening_data,  # type: ignore
 ):
     """Test _get_total_tracks_listened method."""
-    total = insights_generator._get_total_tracks_listened()
+    total = insights_generator._get_total_tracks_listened()  # type: ignore
     assert total == 2
 
 
 def test_audio_features_averages(
-    insights_generator: InsightsGenerator, sample_listening_data
+    insights_generator: InsightsGenerator,
+    sample_listening_data,  # type: ignore
 ):
     """Test _get_audio_features_averages method."""
-    averages = insights_generator._get_audio_features_averages()
+    averages = insights_generator._get_audio_features_averages()  # type: ignore
     assert isinstance(averages, dict)
     if averages:  # Only check if there are features
         assert "danceability" in averages
@@ -146,7 +149,8 @@ def test_audio_features_averages(
 
 
 def test_get_detailed_insights_with_data(
-    insights_generator: InsightsGenerator, sample_listening_data
+    insights_generator: InsightsGenerator,
+    sample_listening_data,  # type: ignore
 ):
     """Test get_detailed_insights with sample data."""
     result = insights_generator.get_detailed_insights()

@@ -44,7 +44,7 @@ def test_insights_with_large_dataset(db_session: Session):
     listening_records = []
     for i in range(100):
         record = ListeningHistory(
-            user_id=user.user_id,
+            user_id=user.user_id,  # type: ignore
             track_id=f"track_{i % 20}",  # 20 unique tracks
             track_name=f"Track {i % 20}",
             artist_id=f"artist_{i % 10}",  # 10 unique artists
@@ -52,13 +52,13 @@ def test_insights_with_large_dataset(db_session: Session):
             played_at=datetime.now() - timedelta(days=i % 30),
             duration_ms=180000 + (i * 1000),  # Varying durations
         )
-        listening_records.append(record)
+        listening_records.append(record)  # type: ignore
 
-    db_session.add_all(listening_records)
+    db_session.add_all(listening_records)  # type: ignore
     db_session.commit()
 
     # Test insights generation
-    insights_gen = InsightsGenerator(db=db_session, user_id=user.user_id)
+    insights_gen = InsightsGenerator(db=db_session, user_id=str(user.user_id))  # type: ignore
     insights = insights_gen.get_basic_insights()
 
     assert insights["total_tracks_listened"] == 100
@@ -97,7 +97,7 @@ def test_insights_with_time_ranges(db_session: Session):
 
     db_session.commit()
 
-    insights_gen = InsightsGenerator(db=db_session, user_id=user.user_id)
+    insights_gen = InsightsGenerator(db=db_session, user_id=str(user.user_id))  # type: ignore
     insights = insights_gen.get_basic_insights()
 
     assert insights["total_tracks_listened"] == 4
@@ -146,10 +146,10 @@ def test_audio_features_edge_cases(db_session: Session):
         db_session.query(AudioFeatures).filter_by(track_id="extreme_high").first()
     )
 
-    assert low_feature.danceability == 0.0
-    assert low_feature.tempo == 50.0
-    assert high_feature.danceability == 1.0
-    assert high_feature.tempo == 200.0
+    assert low_feature is not None and low_feature.danceability == 0.0  # type: ignore
+    assert low_feature is not None and low_feature.tempo == 50.0  # type: ignore
+    assert high_feature is not None and high_feature.danceability == 1.0  # type: ignore
+    assert high_feature is not None and high_feature.tempo == 200.0  # type: ignore
 
 
 def test_insights_empty_user(db_session: Session):
@@ -160,7 +160,7 @@ def test_insights_empty_user(db_session: Session):
     db_session.add(user)
     db_session.commit()
 
-    insights_gen = InsightsGenerator(db=db_session, user_id=user.user_id)
+    insights_gen = InsightsGenerator(db=db_session, user_id=str(user.user_id))  # type: ignore
     insights = insights_gen.get_basic_insights()
 
     # Should handle empty data gracefully
@@ -194,5 +194,5 @@ def test_user_token_expiration_handling(db_session: Session):
     db_session.commit()
 
     # Verify token expiration status
-    assert expired_user.token_expires_at < datetime.now()
-    assert valid_user.token_expires_at > datetime.now()
+    assert expired_user.token_expires_at < datetime.now()  # type: ignore
+    assert valid_user.token_expires_at > datetime.now()  # type: ignore

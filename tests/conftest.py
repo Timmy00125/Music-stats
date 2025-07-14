@@ -6,8 +6,9 @@ import pytest
 from typing import Generator
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.engine import Engine
+from sqlalchemy.orm import Session
 from app.database import Base
-from app.models import User, ListeningHistory, AudioFeatures, TopArtist, TopTrack
 
 
 @pytest.fixture(scope="session")
@@ -19,7 +20,7 @@ def engine():
 
 
 @pytest.fixture(scope="function")
-def db_session(engine) -> Generator:
+def db_session(engine: Engine) -> Generator[Session, None, None]:
     """Create a new database session for a test."""
     connection = engine.connect()
     transaction = connection.begin()
